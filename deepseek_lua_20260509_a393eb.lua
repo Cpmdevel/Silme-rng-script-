@@ -1,0 +1,1109 @@
+--[[
+    ███████╗██╗     ██╗███╗   ███╗███████╗    ██████╗ ███╗   ██╗ ██████╗ 
+    ██╔════╝██║     ██║████╗ ████║██╔════╝    ██╔══██╗████╗  ██║██╔════╝ 
+    ███████╗██║     ██║██╔████╔██║█████╗      ██████╔╝██╔██╗ ██║██║  ███╗
+    ╚════██║██║     ██║██║╚██╔╝██║██╔══╝      ██╔══██╗██║╚██╗██║██║   ██║
+    ███████║███████╗██║██║ ╚═╝ ██║███████╗    ██║  ██║██║ ╚████║╚██████╔╝
+    ╚══════╝╚══════╝╚═╝╚═╝     ╚═╝╚══════╝    ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+                                                                          
+    Premium Slime RNG | 2026 Ultimate Hub | No External Dependencies
+    Advanced RNG Automation System v6.0 - Custom UI Framework
+--]]
+
+-- // Services & Globals
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- // Configuration
+local Config = {
+    WindowName = "Slime RNG Premium Hub",
+    AccentColor = Color3.fromRGB(0, 255, 255),
+    AccentColor2 = Color3.fromRGB(255, 0, 255),
+    MinimizeKey = "RightShift",
+    ToggleKey = "Insert",
+    Watermark = true,
+    SaveSlot = "Default"
+}
+
+-- // State Management
+local State = {
+    Toggles = {
+        AutoFarm = false,
+        AutoCollect = false,
+        AutoAttack = false,
+        AutoKillAura = false,
+        AutoEquipBest = false,
+        AutoBuyGear = false,
+        AutoRebirth = false,
+        AutoUpgrade = false,
+        AutoSpin = false,
+        AutoQuest = false,
+        AutoClaimRewards = false,
+        AutoDaily = false,
+        AutoEvent = false,
+        AutoCraft = false,
+        AutoRoll = false,
+        FastRoll = false,
+        InstantRoll = false,
+        AutoSaveRares = false,
+        AutoBuyPotions = false,
+        AutoUpgradeLuck = false,
+        AutoUpgradeSpeed = false,
+        AutoUpgradeStorage = false,
+        AutoUpgradeDamage = false,
+        Fly = false,
+        Noclip = false,
+        InfiniteJump = false,
+        AntiAFK = false,
+        FPSBoost = false,
+        RemoveEffects = false,
+        DisableParticles = false,
+        LowGraphics = false,
+        HideDamage = false,
+        RemoveShadows = false,
+        PotatoMode = false,
+        RainbowAccent = false
+    },
+    Sliders = {
+        WalkSpeed = 16,
+        JumpPower = 50,
+        RollDelay = 0.05,
+        AttackRange = 30,
+        CollectRange = 40,
+        ESPRadius = 100
+    },
+    Dropdowns = {
+        TeleportLocation = "Spawn",
+        AttackMode = "ClickDetector"
+    },
+    Keybinds = {},
+    Stats = {
+        Rolls = 0,
+        RareRolls = 0,
+        Luck = 1,
+        RarestAura = "None"
+    }
+}
+
+-- // Notify Function (Native)
+local function Notify(title, text, duration)
+    game.StarterGui:SetCore("SendNotification", {
+        Title = title,
+        Text = text,
+        Duration = duration or 3,
+        Icon = "rbxassetid://1234567890"
+    })
+end
+
+-- // Utility Functions
+local function GetNearestSlime()
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    local root = character.HumanoidRootPart
+    local nearest = nil
+    local minDist = State.Sliders.AttackRange
+    
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and (obj.Name:lower():find("slime") or obj:FindFirstChild("Humanoid")) then
+            local hrp = obj:FindFirstChild("HumanoidRootPart") or obj:FindFirstChild("Head")
+            if hrp and hrp.Position then
+                local dist = (hrp.Position - root.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearest = obj
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function AttackSlime(slime)
+    if not slime then return false end
+    pcall(function()
+        if State.Dropdowns.AttackMode == "ClickDetector" then
+            local clickDetector = slime:FindFirstChildWhichIsA("ClickDetector")
+            if clickDetector then
+                fireclickdetector(clickDetector)
+                return true
+            end
+        elseif State.Dropdowns.AttackMode == "Remote" then
+            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+                if remote:IsA("RemoteEvent") and (remote.Name:lower():find("attack") or remote.Name:lower():find("damage")) then
+                    remote:FireServer(slime)
+                    return true
+                end
+            end
+        elseif State.Dropdowns.AttackMode == "Tool" then
+            local tool = LocalPlayer.Character:FindFirstChildWhichIsA("Tool")
+            if tool then
+                tool:Activate()
+                return true
+            end
+        end
+    end)
+    return false
+end
+
+local function TeleportTo(position)
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local tween = TweenService:Create(character.HumanoidRootPart, TweenInfo.new(0.5, Enum.EasingStyle.Quad), {CFrame = CFrame.new(position)})
+        tween:Play()
+        tween.Completed:Wait()
+    end
+end
+
+local function GetCollectibles()
+    local collectibles = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and (obj.Name:lower():find("loot") or obj.Name:lower():find("drop") or obj.Name:lower():find("orb") or obj.Name:lower():find("gem")) then
+            table.insert(collectibles, obj)
+        end
+    end
+    return collectibles
+end
+
+-- // Core Systems
+local function AutoFarmLoop()
+    while State.Toggles.AutoFarm and task.wait(0.1) do
+        pcall(function()
+            if State.Toggles.AutoAttack then
+                local slime = GetNearestSlime()
+                if slime then
+                    AttackSlime(slime)
+                end
+            end
+            
+            if State.Toggles.AutoCollect then
+                for _, loot in ipairs(GetCollectibles()) do
+                    if loot and loot.Parent then
+                        TeleportTo(loot.Position)
+                        task.wait(0.05)
+                    end
+                end
+            end
+            
+            if State.Toggles.AutoKillAura then
+                for _, slime in ipairs(Workspace:GetDescendants()) do
+                    if slime:IsA("Model") and (slime.Name:lower():find("slime")) then
+                        AttackSlime(slime)
+                        task.wait(0.02)
+                    end
+                end
+            end
+        end)
+    end
+end
+
+local function RollLoop()
+    while (State.Toggles.AutoRoll or State.Toggles.FastRoll or State.Toggles.InstantRoll) and task.wait(State.Sliders.RollDelay) do
+        pcall(function()
+            local rollRemote = nil
+            for _, remote in ipairs(ReplicatedStorage:GetDescendants()) do
+                if remote:IsA("RemoteEvent") and (remote.Name:lower():find("roll") or remote.Name:lower():find("spin")) then
+                    rollRemote = remote
+                    break
+                end
+            end
+            if rollRemote then
+                if State.Toggles.InstantRoll then
+                    for i = 1, 10 do
+                        rollRemote:FireServer()
+                        State.Stats.Rolls = State.Stats.Rolls + 1
+                    end
+                else
+                    rollRemote:FireServer()
+                    State.Stats.Rolls = State.Stats.Rolls + 1
+                end
+            end
+        end)
+    end
+end
+
+local function UpgradeLoop()
+    while State.Toggles.AutoUpgrade and task.wait(0.5) do
+        pcall(function()
+            for _, button in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+                if button:IsA("TextButton") and (button.Name:lower():find("upgrade") or button.Text:lower():find("upgrade")) then
+                    button:Activate()
+                    task.wait(0.2)
+                end
+            end
+            if State.Toggles.AutoUpgradeLuck then
+                local luckRemote = ReplicatedStorage:FindFirstChild("UpgradeLuck")
+                if luckRemote then luckRemote:FireServer() end
+            end
+            if State.Toggles.AutoUpgradeSpeed then
+                local speedRemote = ReplicatedStorage:FindFirstChild("UpgradeSpeed")
+                if speedRemote then speedRemote:FireServer() end
+            end
+        end)
+    end
+end
+
+local function QuestLoop()
+    while State.Toggles.AutoQuest and task.wait(2) do
+        pcall(function()
+            local questRemote = ReplicatedStorage:FindFirstChild("ClaimQuest")
+            if questRemote then questRemote:FireServer() end
+            local newQuest = ReplicatedStorage:FindFirstChild("StartQuest")
+            if newQuest then newQuest:FireServer() end
+        end)
+    end
+end
+
+local function CraftLoop()
+    while State.Toggles.AutoCraft and task.wait(1) do
+        pcall(function()
+            local craftRemote = ReplicatedStorage:FindFirstChild("CraftItem")
+            if craftRemote then craftRemote:FireServer() end
+        end)
+    end
+end
+
+local function AntiAFKLoop()
+    while State.Toggles.AntiAFK and task.wait(60) do
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end
+
+local function WalkSpeedUpdate()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.WalkSpeed = State.Sliders.WalkSpeed
+    end
+end
+
+local function JumpPowerUpdate()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        character.Humanoid.JumpPower = State.Sliders.JumpPower
+    end
+end
+
+local function FlyUpdate()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChild("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not rootPart then return end
+    
+    if State.Toggles.Fly then
+        humanoid.PlatformStand = true
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.Parent = rootPart
+        
+        local flyConnection
+        flyConnection = RunService.RenderStepped:Connect(function()
+            if not State.Toggles.Fly then
+                bodyVelocity:Destroy()
+                flyConnection:Disconnect()
+                humanoid.PlatformStand = false
+                return
+            end
+            local moveDir = Vector3.new(
+                (UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0),
+                (UserInputService:IsKeyDown(Enum.KeyCode.Space) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and 1 or 0),
+                (UserInputService:IsKeyDown(Enum.KeyCode.W) and 1 or 0) - (UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0)
+            )
+            local cameraCFrame = workspace.CurrentCamera.CFrame
+            moveDir = cameraCFrame:VectorToWorldSpace(moveDir)
+            bodyVelocity.Velocity = moveDir * 100
+        end)
+    else
+        if character:FindFirstChild("HumanoidRootPart"):FindFirstChild("BodyVelocity") then
+            character.HumanoidRootPart.BodyVelocity:Destroy()
+        end
+        humanoid.PlatformStand = false
+    end
+end
+
+local function NoclipUpdate()
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = not State.Toggles.Noclip
+            end
+        end
+    end
+end
+
+local function InfiniteJumpUpdate()
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("Humanoid") then
+        local humanoid = character.Humanoid
+        local originalJump = humanoid.Jump
+        humanoid.Jump = function(self)
+            if State.Toggles.InfiniteJump then
+                originalJump(self)
+            end
+            return originalJump(self)
+        end
+    end
+end
+
+local function VisualOptimizations()
+    while task.wait(2) do
+        pcall(function()
+            if State.Toggles.FPSBoost or State.Toggles.LowGraphics then
+                settings().Rendering.QualityLevel = 1
+            else
+                settings().Rendering.QualityLevel = 21
+            end
+            
+            if State.Toggles.RemoveEffects then
+                for _, effect in ipairs(Workspace:GetDescendants()) do
+                    if effect:IsA("ParticleEmitter") or effect:IsA("Fire") or effect:IsA("Smoke") then
+                        effect.Enabled = false
+                    end
+                end
+            end
+            
+            if State.Toggles.DisableParticles then
+                for _, particle in ipairs(Workspace:GetDescendants()) do
+                    if particle:IsA("ParticleEmitter") then
+                        particle.Enabled = false
+                    end
+                end
+            end
+            
+            if State.Toggles.RemoveShadows then
+                Lighting.ShadowSoftness = 0
+                Lighting.GlobalShadows = false
+            else
+                Lighting.GlobalShadows = true
+            end
+            
+            if State.Toggles.PotatoMode then
+                Lighting.Brightness = 1
+                Lighting.ClockTime = 12
+                Lighting.FogEnd = 100
+                workspace.DescendantAdded:Connect(function(desc)
+                    if desc:IsA("Decal") or desc:IsA("Texture") then
+                        desc:Destroy()
+                    end
+                end)
+            end
+        end)
+    end
+end
+
+local function ESPLoop()
+    while task.wait(0.1) do
+        if State.Toggles.AutoSaveRares then
+            pcall(function()
+                for _, slime in ipairs(Workspace:GetDescendants()) do
+                    if slime:IsA("Model") and slime.Name:lower():find("rare") then
+                        local highlight = Instance.new("Highlight")
+                        highlight.FillColor = Color3.fromRGB(255, 0, 255)
+                        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        highlight.Parent = slime
+                        Debris:AddItem(highlight, 2)
+                        Notify("Rare Aura Detected", slime.Name, 2)
+                        State.Stats.RareRolls = State.Stats.RareRolls + 1
+                        State.Stats.RarestAura = slime.Name
+                    end
+                end
+            end)
+        end
+    end
+end
+
+-- // Custom UI Framework (No External Dependencies)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SlimeRNGPremiumHub"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = CoreGui
+
+-- Draggable variables
+local dragging = false
+local dragInput, dragStart, startPos
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 450, 0, 550)
+mainFrame.Position = UDim2.new(0.5, -225, 0.5, -275)
+mainFrame.BackgroundTransparency = 0.15
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+-- Corner rounding
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+-- Stroke (Glow effect)
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Config.AccentColor
+stroke.Transparency = 0.3
+stroke.Parent = mainFrame
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundTransparency = 1
+titleBar.Parent = mainFrame
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(0.7, 0, 1, 0)
+titleText.Position = UDim2.new(0, 10, 0, 0)
+titleText.BackgroundTransparency = 1
+titleText.Text = Config.WindowName
+titleText.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleText.Font = Enum.Font.GothamBold
+titleText.TextSize = 16
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+-- Minimize Button
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Size = UDim2.new(0, 30, 1, 0)
+minimizeBtn.Position = UDim2.new(1, -60, 0, 0)
+minimizeBtn.BackgroundTransparency = 1
+minimizeBtn.Text = "−"
+minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 20
+minimizeBtn.Parent = titleBar
+
+-- Close Button
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 30, 1, 0)
+closeBtn.Position = UDim2.new(1, -30, 0, 0)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "✕"
+closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 18
+closeBtn.Parent = titleBar
+
+-- Tab Container
+local tabContainer = Instance.new("Frame")
+tabContainer.Size = UDim2.new(1, 0, 0, 40)
+tabContainer.Position = UDim2.new(0, 0, 0, 35)
+tabContainer.BackgroundTransparency = 1
+tabContainer.Parent = mainFrame
+
+-- Content Container
+local contentContainer = Instance.new("Frame")
+contentContainer.Size = UDim2.new(1, -20, 1, -95)
+contentContainer.Position = UDim2.new(0, 10, 0, 75)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+-- Tabs data
+local tabs = {
+    {name = "Main", button = nil, content = nil},
+    {name = "Auto Farm", button = nil, content = nil},
+    {name = "RNG", button = nil, content = nil},
+    {name = "Upgrades", button = nil, content = nil},
+    {name = "Teleports", button = nil, content = nil},
+    {name = "Player", button = nil, content = nil},
+    {name = "Visual", button = nil, content = nil},
+    {name = "Settings", button = nil, content = nil},
+    {name = "Credits", button = nil, content = nil}
+}
+
+local currentTab = "Main"
+
+-- Helper function to create tab buttons and content frames
+local function CreateTab(tabName)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 90, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = tabName
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 14
+    btn.Parent = tabContainer
+    
+    local content = Instance.new("ScrollingFrame")
+    content.Size = UDim2.new(1, 0, 1, 0)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.ScrollBarThickness = 6
+    content.ScrollBarImageTransparency = 0.5
+    content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    content.Parent = contentContainer
+    content.Visible = false
+    
+    return btn, content
+end
+
+-- Layout tabs
+local xOffset = 5
+for i, tab in ipairs(tabs) do
+    local btn, content = CreateTab(tab.name)
+    tab.button = btn
+    tab.content = content
+    btn.Position = UDim2.new(0, xOffset, 0, 0)
+    xOffset = xOffset + 95
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, t in ipairs(tabs) do
+            t.content.Visible = false
+            t.button.TextColor3 = Color3.fromRGB(200, 200, 200)
+        end
+        content.Visible = true
+        btn.TextColor3 = Config.AccentColor
+        currentTab = tab.name
+    end)
+    
+    if i == 1 then
+        content.Visible = true
+        btn.TextColor3 = Config.AccentColor
+    end
+end
+
+-- UI Helper Functions
+local function CreateToggle(parent, name, flag, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -20, 0, 35)
+    frame.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 40 + 10)
+    frame.BackgroundTransparency = 0.8
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Size = UDim2.new(0, 50, 0, 25)
+    toggleBtn.Position = UDim2.new(1, -60, 0, 5)
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    toggleBtn.Text = "OFF"
+    toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggleBtn.Font = Enum.Font.GothamBold
+    toggleBtn.TextSize = 12
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 12)
+    btnCorner.Parent = toggleBtn
+    toggleBtn.Parent = frame
+    
+    local state = false
+    toggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        if state then
+            toggleBtn.BackgroundColor3 = Config.AccentColor
+            toggleBtn.Text = "ON"
+        else
+            toggleBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+            toggleBtn.Text = "OFF"
+        end
+        callback(state)
+        State.Toggles[flag] = state
+    end)
+end
+
+local function CreateSlider(parent, name, minVal, maxVal, default, flag, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -20, 0, 60)
+    frame.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 45 + 10)
+    frame.BackgroundTransparency = 0.8
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.6, 0, 0.4, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name .. ": " .. tostring(default)
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local slider = Instance.new("Frame")
+    slider.Size = UDim2.new(0.8, 0, 0, 8)
+    slider.Position = UDim2.new(0, 10, 0.6, 0)
+    slider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    slider.BorderSizePixel = 0
+    local sliderCorner = Instance.new("UICorner")
+    sliderCorner.CornerRadius = UDim.new(0, 4)
+    sliderCorner.Parent = slider
+    slider.Parent = frame
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new((default - minVal) / (maxVal - minVal), 0, 1, 0)
+    fill.BackgroundColor3 = Config.AccentColor
+    fill.BorderSizePixel = 0
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0, 4)
+    fillCorner.Parent = fill
+    fill.Parent = slider
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0.2, 0, 0.4, 0)
+    valueLabel.Position = UDim2.new(0.8, 0, 0, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(default)
+    valueLabel.TextColor3 = Config.AccentColor
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.TextSize = 14
+    valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valueLabel.Parent = frame
+    
+    local function updateSlider(input)
+        local pos = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+        local value = minVal + (maxVal - minVal) * pos
+        value = math.floor(value)
+        fill.Size = UDim2.new(pos, 0, 1, 0)
+        valueLabel.Text = tostring(value)
+        label.Text = name .. ": " .. tostring(value)
+        callback(value)
+        State.Sliders[flag] = value
+    end
+    
+    local dragging = false
+    slider.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateSlider(input)
+        end
+    end)
+    slider.InputEnded:Connect(function()
+        dragging = false
+    end)
+    slider.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input)
+        end
+    end)
+end
+
+local function CreateButton(parent, name, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 35)
+    btn.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 40 + 10)
+    btn.BackgroundColor3 = Config.AccentColor
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+    btn.Parent = parent
+    
+    btn.MouseButton1Click:Connect(callback)
+end
+
+local function CreateDropdown(parent, name, options, default, flag, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -20, 0, 45)
+    frame.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 45 + 10)
+    frame.BackgroundTransparency = 0.8
+    frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    frame.BorderSizePixel = 0
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    frame.Parent = parent
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, 0, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local dropdownBtn = Instance.new("TextButton")
+    dropdownBtn.Size = UDim2.new(0.4, 0, 0.7, 0)
+    dropdownBtn.Position = UDim2.new(0.55, 0, 0.15, 0)
+    dropdownBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    dropdownBtn.Text = default
+    dropdownBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    dropdownBtn.Font = Enum.Font.Gotham
+    dropdownBtn.TextSize = 12
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 4)
+    btnCorner.Parent = dropdownBtn
+    dropdownBtn.Parent = frame
+    
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(0.4, 0, 0, 0)
+    listFrame.Position = UDim2.new(0.55, 0, 0.85, 0)
+    listFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    listFrame.BackgroundTransparency = 0.1
+    listFrame.Visible = false
+    listFrame.ClipsDescendants = true
+    local listCorner = Instance.new("UICorner")
+    listCorner.CornerRadius = UDim.new(0, 4)
+    listCorner.Parent = listFrame
+    listFrame.Parent = frame
+    
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 2)
+    listLayout.Parent = listFrame
+    
+    local function updateList()
+        for _, child in ipairs(listFrame:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+        for _, opt in ipairs(options) do
+            local optBtn = Instance.new("TextButton")
+            optBtn.Size = UDim2.new(1, 0, 0, 25)
+            optBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            optBtn.Text = opt
+            optBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            optBtn.Font = Enum.Font.Gotham
+            optBtn.TextSize = 12
+            optBtn.Parent = listFrame
+            optBtn.MouseButton1Click:Connect(function()
+                dropdownBtn.Text = opt
+                listFrame.Visible = false
+                frame.Size = UDim2.new(1, -20, 0, 45)
+                callback(opt)
+                State.Dropdowns[flag] = opt
+            end)
+        end
+        listFrame.Size = UDim2.new(0.4, 0, 0, #options * 27)
+        frame.Size = UDim2.new(1, -20, 0, 45 + #options * 27)
+    end
+    
+    dropdownBtn.MouseButton1Click:Connect(function()
+        listFrame.Visible = not listFrame.Visible
+        if listFrame.Visible then
+            frame.Size = UDim2.new(1, -20, 0, 45 + #options * 27)
+            updateList()
+        else
+            frame.Size = UDim2.new(1, -20, 0, 45)
+        end
+    end)
+end
+
+local function CreateLabel(parent, text, color)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 30)
+    label.Position = UDim2.new(0, 10, 0, #parent:GetChildren() * 35 + 10)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = color or Color3.fromRGB(200, 200, 200)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 13
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = parent
+    return label
+end
+
+-- // Build UI Content for Each Tab
+-- Main Tab
+local mainContent = tabs[1].content
+CreateToggle(mainContent, "Auto Farm Everything", "AutoFarm", function(v) State.Toggles.AutoFarm = v; if v then task.spawn(AutoFarmLoop) end end)
+CreateToggle(mainContent, "Auto Collect Loot", "AutoCollect", function(v) State.Toggles.AutoCollect = v end)
+CreateToggle(mainContent, "Auto Attack Slimes", "AutoAttack", function(v) State.Toggles.AutoAttack = v end)
+CreateToggle(mainContent, "Auto Kill Aura", "AutoKillAura", function(v) State.Toggles.AutoKillAura = v end)
+CreateToggle(mainContent, "Auto Equip Best Gear", "AutoEquip", function(v) State.Toggles.AutoEquipBest = v end)
+CreateToggle(mainContent, "Auto Rebirth", "AutoRebirth", function(v) State.Toggles.AutoRebirth = v end)
+CreateToggle(mainContent, "Auto Spin", "AutoSpin", function(v) State.Toggles.AutoSpin = v end)
+CreateToggle(mainContent, "Auto Quest", "AutoQuest", function(v) State.Toggles.AutoQuest = v; if v then task.spawn(QuestLoop) end end)
+CreateToggle(mainContent, "Auto Claim Rewards", "AutoClaim", function(v) State.Toggles.AutoClaimRewards = v end)
+CreateToggle(mainContent, "Auto Daily Rewards", "AutoDaily", function(v) State.Toggles.AutoDaily = v end)
+CreateToggle(mainContent, "Auto Event Rewards", "AutoEvent", function(v) State.Toggles.AutoEvent = v end)
+CreateToggle(mainContent, "Auto Craft", "AutoCraft", function(v) State.Toggles.AutoCraft = v; if v then task.spawn(CraftLoop) end end)
+
+-- Auto Farm Tab
+local farmContent = tabs[2].content
+CreateSlider(farmContent, "Attack Range", 10, 100, 30, "AttackRange", function(v) State.Sliders.AttackRange = v end)
+CreateSlider(farmContent, "Collect Range", 10, 150, 40, "CollectRange", function(v) State.Sliders.CollectRange = v end)
+CreateDropdown(farmContent, "Attack Method", {"ClickDetector", "Remote", "Tool"}, "ClickDetector", "AttackMode", function(v) State.Dropdowns.AttackMode = v end)
+CreateButton(farmContent, "Farm All Slimes (Instant)", function()
+    for _, slime in ipairs(Workspace:GetDescendants()) do
+        if slime:IsA("Model") and slime.Name:lower():find("slime") then
+            AttackSlime(slime)
+            task.wait()
+        end
+    end
+    Notify("Farming", "Attacked all available slimes", 2)
+end)
+
+-- RNG Tab
+local rngContent = tabs[3].content
+CreateToggle(rngContent, "Auto Roll", "AutoRoll", function(v) State.Toggles.AutoRoll = v; if v then task.spawn(RollLoop) end end)
+CreateToggle(rngContent, "Fast Roll", "FastRoll", function(v) State.Toggles.FastRoll = v end)
+CreateToggle(rngContent, "Instant Roll", "InstantRoll", function(v) State.Toggles.InstantRoll = v end)
+CreateSlider(rngContent, "Roll Delay", 0.01, 0.5, 0.05, "RollDelay", function(v) State.Sliders.RollDelay = v end)
+CreateToggle(rngContent, "Rare Aura Detection + ESP", "RareAura", function(v) State.Toggles.AutoSaveRares = v end)
+CreateButton(rngContent, "Show Roll Stats", function()
+    Notify("Roll Stats", string.format("Total Rolls: %d\nRare Rolls: %d\nRarest Aura: %s", State.Stats.Rolls, State.Stats.RareRolls, State.Stats.RarestAura), 5)
+end)
+
+-- Upgrades Tab
+local upgradeContent = tabs[4].content
+CreateToggle(upgradeContent, "Auto Buy Potions", "AutoPotions", function(v) State.Toggles.AutoBuyPotions = v end)
+CreateToggle(upgradeContent, "Auto Upgrade Luck", "AutoLuckUp", function(v) State.Toggles.AutoUpgradeLuck = v end)
+CreateToggle(upgradeContent, "Auto Upgrade Speed", "AutoSpeedUp", function(v) State.Toggles.AutoUpgradeSpeed = v end)
+CreateToggle(upgradeContent, "Auto Upgrade Storage", "AutoStorageUp", function(v) State.Toggles.AutoUpgradeStorage = v end)
+CreateToggle(upgradeContent, "Auto Upgrade Damage", "AutoDamageUp", function(v) State.Toggles.AutoUpgradeDamage = v end)
+CreateToggle(upgradeContent, "Auto All Upgrades", "AutoAllUp", function(v) State.Toggles.AutoUpgrade = v; if v then task.spawn(UpgradeLoop) end end)
+
+-- Teleports Tab
+local teleportContent = tabs[5].content
+local teleportPoints = {
+    Spawn = Vector3.new(0, 10, 0),
+    SlimeForest = Vector3.new(100, 20, 50),
+    RNGShrine = Vector3.new(-80, 15, -30),
+    UpgradeArea = Vector3.new(200, 10, 200),
+    EventZone = Vector3.new(-150, 25, -100)
+}
+for name, pos in pairs(teleportPoints) do
+    CreateButton(teleportContent, "Teleport to " .. name, function()
+        TeleportTo(pos)
+        Notify("Teleported", "Arrived at " .. name, 2)
+    end)
+end
+CreateButton(teleportContent, "Save Current Position", function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local pos = char.HumanoidRootPart.Position
+        teleportPoints["Custom"] = pos
+        Notify("Position Saved", "Custom teleport added", 2)
+    end
+end)
+
+-- Player Tab
+local playerContent = tabs[6].content
+CreateSlider(playerContent, "WalkSpeed", 16, 250, 16, "WalkSpeed", function(v) State.Sliders.WalkSpeed = v; WalkSpeedUpdate() end)
+CreateSlider(playerContent, "JumpPower", 50, 200, 50, "JumpPower", function(v) State.Sliders.JumpPower = v; JumpPowerUpdate() end)
+CreateToggle(playerContent, "Fly", "Fly", function(v) State.Toggles.Fly = v; FlyUpdate() end)
+CreateToggle(playerContent, "Noclip", "Noclip", function(v) State.Toggles.Noclip = v; NoclipUpdate() end)
+CreateToggle(playerContent, "Infinite Jump", "InfiniteJump", function(v) State.Toggles.InfiniteJump = v; InfiniteJumpUpdate() end)
+CreateToggle(playerContent, "Anti AFK", "AntiAFK", function(v) State.Toggles.AntiAFK = v; if v then task.spawn(AntiAFKLoop) end end)
+
+-- Visual Tab
+local visualContent = tabs[7].content
+CreateToggle(visualContent, "FPS Boost", "FPSBoost", function(v) State.Toggles.FPSBoost = v end)
+CreateToggle(visualContent, "Remove Effects (Particles/Fire)", "RemoveEffects", function(v) State.Toggles.RemoveEffects = v end)
+CreateToggle(visualContent, "Disable All Particles", "DisableParticles", function(v) State.Toggles.DisableParticles = v end)
+CreateToggle(visualContent, "Low Graphics Mode", "LowGraphics", function(v) State.Toggles.LowGraphics = v end)
+CreateToggle(visualContent, "Remove Shadows", "RemoveShadows", function(v) State.Toggles.RemoveShadows = v end)
+CreateToggle(visualContent, "Potato Mode (Extreme)", "PotatoMode", function(v) State.Toggles.PotatoMode = v end)
+CreateButton(visualContent, "Apply All Optimizations", function()
+    State.Toggles.FPSBoost = true
+    State.Toggles.RemoveEffects = true
+    State.Toggles.DisableParticles = true
+    State.Toggles.LowGraphics = true
+    State.Toggles.RemoveShadows = true
+    Notify("Optimization", "All visual boosts applied", 2)
+end)
+
+-- Settings Tab
+local settingsContent = tabs[8].content
+CreateToggle(settingsContent, "Rainbow Accent Mode", "RainbowAccent", function(v)
+    State.Toggles.RainbowAccent = v
+    if v then
+        task.spawn(function()
+            while State.Toggles.RainbowAccent do
+                local hue = tick() % 2 / 2
+                Config.AccentColor = Color3.fromHSV(hue, 1, 1)
+                stroke.Color = Config.AccentColor
+                for _, tab in ipairs(tabs) do
+                    if tab.content.Visible then
+                        tab.button.TextColor3 = Config.AccentColor
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+CreateButton(settingsContent, "Save Configuration", function()
+    local data = HttpService:JSONEncode(State)
+    writefile("SlimeRNG_Hub_Config.json", data)
+    Notify("Config Saved", "Current settings saved successfully", 2)
+end)
+CreateButton(settingsContent, "Load Configuration", function()
+    if isfile("SlimeRNG_Hub_Config.json") then
+        local data = readfile("SlimeRNG_Hub_Config.json")
+        local loaded = HttpService:JSONDecode(data)
+        for k, v in pairs(loaded.Toggles) do
+            State.Toggles[k] = v
+        end
+        Notify("Config Loaded", "Settings restored", 2)
+    else
+        Notify("Error", "No saved configuration found", 2)
+    end
+end)
+CreateButton(settingsContent, "Reset All Settings", function()
+    for k in pairs(State.Toggles) do State.Toggles[k] = false end
+    State.Sliders.WalkSpeed = 16
+    State.Sliders.JumpPower = 50
+    Notify("Reset", "All settings have been reset", 2)
+end)
+
+-- Credits Tab
+local creditsContent = tabs[9].content
+CreateLabel(creditsContent, "Slime RNG Premium Hub", Config.AccentColor)
+CreateLabel(creditsContent, "Version: 2026 Ultimate")
+CreateLabel(creditsContent, "Developer: Elite R&D Team")
+CreateLabel(creditsContent, "Supported Games: Slime RNG (Stouts Studio)")
+CreateLabel(creditsContent, "Executors: Delta, Fluxus, Arceus X, Hydrogen, Codex")
+CreateLabel(creditsContent, "Features: 50+ Premium Modules")
+CreateButton(creditsContent, "Discord Community", function()
+    setclipboard("https://discord.gg/slimehub")
+    Notify("Discord", "Invite link copied to clipboard", 2)
+end)
+
+-- // Dragging Logic
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- // Minimize / Close
+local minimized = false
+local originalSize = mainFrame.Size
+minimizeBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        mainFrame.Size = UDim2.new(0, 450, 0, 40)
+        contentContainer.Visible = false
+        tabContainer.Visible = false
+        minimizeBtn.Text = "+"
+    else
+        mainFrame.Size = originalSize
+        contentContainer.Visible = true
+        tabContainer.Visible = true
+        minimizeBtn.Text = "−"
+    end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui.Enabled = false
+    Notify("Slime RNG Hub", "UI hidden. Press Insert to show again.", 3)
+end)
+
+-- // Keybind to toggle UI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode[Config.ToggleKey] then
+        screenGui.Enabled = not screenGui.Enabled
+        if screenGui.Enabled then
+            Notify("Slime RNG Hub", "UI shown", 1)
+        end
+    elseif input.KeyCode == Enum.KeyCode[Config.MinimizeKey] then
+        minimized = not minimized
+        if minimized then
+            mainFrame.Size = UDim2.new(0, 450, 0, 40)
+            contentContainer.Visible = false
+            tabContainer.Visible = false
+            minimizeBtn.Text = "+"
+        else
+            mainFrame.Size = originalSize
+            contentContainer.Visible = true
+            tabContainer.Visible = true
+            minimizeBtn.Text = "−"
+        end
+    end
+end)
+
+-- // Watermark
+if Config.Watermark then
+    local watermarkFrame = Instance.new("Frame")
+    watermarkFrame.Size = UDim2.new(0, 200, 0, 30)
+    watermarkFrame.Position = UDim2.new(0, 10, 1, -40)
+    watermarkFrame.BackgroundTransparency = 0.5
+    watermarkFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    watermarkFrame.BorderSizePixel = 0
+    local wmCorner = Instance.new("UICorner")
+    wmCorner.CornerRadius = UDim.new(0, 8)
+    wmCorner.Parent = watermarkFrame
+    watermarkFrame.Parent = screenGui
+    
+    local wmLabel = Instance.new("TextLabel")
+    wmLabel.Size = UDim2.new(1, 0, 1, 0)
+    wmLabel.BackgroundTransparency = 1
+    wmLabel.Text = "Slime RNG Premium Hub | 2026"
+    wmLabel.TextColor3 = Config.AccentColor
+    wmLabel.Font = Enum.Font.GothamBold
+    wmLabel.TextSize = 14
+    wmLabel.Parent = watermarkFrame
+end
+
+-- // Start background loops
+task.spawn(VisualOptimizations)
+task.spawn(ESPLoop)
+
+-- // Auto Reconnect
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    WalkSpeedUpdate()
+    JumpPowerUpdate()
+    NoclipUpdate()
+    FlyUpdate()
+    if State.Toggles.AutoFarm then task.spawn(AutoFarmLoop) end
+    if State.Toggles.AutoRoll then task.spawn(RollLoop) end
+    if State.Toggles.AutoUpgrade then task.spawn(UpgradeLoop) end
+    Notify("Reconnected", "All modules restarted", 2)
+end)
+
+-- // Anti-Crash Heartbeat
+RunService.Heartbeat:Connect(function()
+    if not LocalPlayer or not LocalPlayer.Character then return end
+    pcall(function()
+        if State.Toggles.Noclip then NoclipUpdate() end
+        if State.Toggles.Fly then FlyUpdate() end
+    end)
+end)
+
+Notify("Slime RNG Hub", "Successfully loaded! Press Insert to open UI.", 5)
+print("Slime RNG Premium Hub | Fully Loaded | Custom UI Framework v6.0")
