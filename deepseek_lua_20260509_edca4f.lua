@@ -1,0 +1,878 @@
+-- SHADOW HUB | SLIME RNG (FIXED)
+-- Premium Roblox Automation Hub
+-- Designed for Slime RNG by Stouts Studio
+-- Version: 1.0.1 | 2026
+-- FIXES: Removed VirtualUser, implemented proper button clicking, added error handling
+
+local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/rayfieldui.lua"))()
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local VirtualInput = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+-- Safe executor detection
+local function detectExecutor()
+    local success, result = pcall(function()
+        return identifyexecutor and identifyexecutor() or "Unknown"
+    end)
+    if success then
+        return result or "Unknown"
+    else
+        return "Unknown"
+    end
+end
+
+local ShadowHub = {
+    Version = "1.0.1",
+    Executor = detectExecutor(),
+    Mobile = UserInputService.TouchEnabled,
+    Toggles = {},
+    Flags = {},
+    Stats = {
+        Rolls = 0,
+        RareRolls = 0,
+        LastRollTime = 0,
+        FarmTime = 0,
+        CoinsEarned = 0
+    },
+    Loops = {},
+    Notify = function(title, text, duration)
+        if Rayfield and Rayfield.Notify then
+            Rayfield:Notify({
+                Title = title,
+                Content = text,
+                Duration = duration or 3
+            })
+        end
+    end,
+    Debug = false,
+    WatermarkActive = true,
+    RainbowUI = false,
+    RainbowHue = 0,
+    CurrentTheme = "Amethyst"
+}
+
+-- LOADING ANIMATION
+local function showLoadingAnimation()
+    local loadingGui = Instance.new("ScreenGui")
+    loadingGui.Name = "ShadowHubLoading"
+    loadingGui.ResetOnSpawn = false
+    loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local background = Instance.new("Frame")
+    background.Size = UDim2.new(1, 0, 1, 0)
+    background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    background.BackgroundTransparency = 0.85
+    background.Parent = loadingGui
+    
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Size = UDim2.new(0, 320, 0, 180)
+    mainFrame.Position = UDim2.new(0.5, -160, 0.5, -90)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    mainFrame.BackgroundTransparency = 0.15
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = background
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = mainFrame
+    
+    local glow = Instance.new("Frame")
+    glow.Size = UDim2.new(1, 0, 1, 0)
+    glow.BackgroundColor3 = Color3.fromRGB(80, 60, 200)
+    glow.BackgroundTransparency = 0.85
+    glow.BorderSizePixel = 0
+    glow.Parent = mainFrame
+    
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.Position = UDim2.new(0, 0, 0, 10)
+    title.BackgroundTransparency = 1
+    title.Text = "Shadow Hub"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.TextSize = 24
+    title.Font = Enum.Font.GothamBold
+    title.TextStrokeTransparency = 0.5
+    title.Parent = mainFrame
+    
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Size = UDim2.new(1, 0, 0, 25)
+    subtitle.Position = UDim2.new(0, 0, 0, 50)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "Premium Slime RNG System"
+    subtitle.TextColor3 = Color3.fromRGB(150, 130, 255)
+    subtitle.TextSize = 14
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.Parent = mainFrame
+    
+    local barBg = Instance.new("Frame")
+    barBg.Size = UDim2.new(0.8, 0, 0, 4)
+    barBg.Position = UDim2.new(0.1, 0, 0.7, 0)
+    barBg.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    barBg.BorderSizePixel = 0
+    barBg.Parent = mainFrame
+    
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(1, 0)
+    barCorner.Parent = barBg
+    
+    local progress = Instance.new("Frame")
+    progress.Size = UDim2.new(0, 0, 1, 0)
+    progress.BackgroundColor3 = Color3.fromRGB(100, 80, 255)
+    progress.BorderSizePixel = 0
+    progress.Parent = barBg
+    
+    local progressCorner = Instance.new("UICorner")
+    progressCorner.CornerRadius = UDim.new(1, 0)
+    progressCorner.Parent = progress
+    
+    loadingGui.Parent = game:GetService("CoreGui")
+    
+    for i = 1, 100 do
+        progress:TweenSize(UDim2.new(i / 100, 0, 1, 0), "Out", "Linear", 0.01)
+        task.wait(0.008)
+    end
+    
+    task.wait(0.2)
+    loadingGui:Destroy()
+end
+
+pcall(showLoadingAnimation)
+
+-- Safe button click function (works on GUI buttons)
+local function clickButton(button)
+    if not button then return false end
+    local success, err = pcall(function()
+        if button:IsA("TextButton") or button:IsA("ImageButton") then
+            -- Method 1: Simulate mouse click
+            button:Click()
+            -- Method 2: Fire MouseButton1Click event
+            if button.MouseButton1Click then
+                button.MouseButton1Click:Fire()
+            end
+            return true
+        end
+    end)
+    return success or false
+end
+
+-- Alternative: Fire a ClickDetector
+local function fireClickDetector(part)
+    for _, detector in pairs(part:GetChildren()) do
+        if detector:IsA("ClickDetector") then
+            detector:Click()
+            return true
+        end
+    end
+    return false
+end
+
+-- ANTI-FPS LAG
+local function setupAntiLag()
+    pcall(function()
+        settings().Rendering.QualityLevel = 1
+        local lighting = game:GetService("Lighting")
+        lighting.GlobalShadows = false
+        lighting.FogEnd = 1000
+        for _, v in pairs(workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") then
+                v.Enabled = false
+            end
+        end
+    end)
+end
+
+-- TELEPORT LOCATIONS (example - adjust to actual game)
+local TeleportZones = {
+    "Meadow", "Forest", "Cavern", "Tundra", "Storm", "Cave", "Heaven",
+    "Jungle", "Canyon", "Mushroom Forest", "Moon", "Redwood Forest"
+}
+
+-- SLIME RARITIES
+local SlimeRarities = {
+    Basic = "Basic", Common = "Common", Uncommon = "Uncommon", Rare = "Rare",
+    Epic = "Epic", Legendary = "Legendary", Mythic = "Mythic", Divine = "Divine"
+}
+
+-- CURRENCY HANDLING (scanning UI)
+local Currency = {
+    GetCoins = function()
+        local coinsGui = game:GetService("CoreGui"):FindFirstChild("CoinCounter")
+        if coinsGui and coinsGui:FindFirstChild("Amount") then
+            local text = coinsGui.Amount.Text
+            local num = tonumber(text:gsub("[^%d]", ""))
+            return num or 0
+        end
+        return 0
+    end
+}
+
+-- TELEPORTATION SYSTEM (find teleport buttons)
+local function teleportToZone(zoneName)
+    local teleportFrame = game:GetService("CoreGui"):FindFirstChild("TeleportFrame")
+    if teleportFrame then
+        for _, button in pairs(teleportFrame:GetDescendants()) do
+            if button:IsA("TextButton") and button.Text and button.Text:find(zoneName) then
+                clickButton(button)
+                ShadowHub.Notify("Teleport", "Teleported to " .. zoneName, 2)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- ANTI AFK (simple)
+local antiAFKConnection = nil
+local function initAntiAFK()
+    if antiAFKConnection then antiAFKConnection:Disconnect() end
+    antiAFKConnection = game:GetService("Players").LocalPlayer.Idled:Connect(function()
+        -- Send a fake key press to reset idle timer
+        VirtualInput:SendKeyEvent(true, "W", false, game)
+        task.wait(0.1)
+        VirtualInput:SendKeyEvent(false, "W", false, game)
+    end)
+end
+
+-- AUTO ROLL
+local rollRunning = false
+local function autoRoll()
+    local rollButton = game:GetService("CoreGui"):FindFirstChild("RollButton")
+    if rollButton and rollButton:IsA("TextButton") then
+        clickButton(rollButton)
+        ShadowHub.Stats.Rolls = ShadowHub.Stats.Rolls + 1
+    end
+end
+
+-- AUTO LOOT (collect dropped items)
+local function autoLoot()
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and obj:FindFirstChild("TouchInterest") and not obj:FindFirstChild("Humanoid") then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and obj:FindFirstChild("HumanoidRootPart") then
+                local distance = (obj.HumanoidRootPart.Position - hrp.Position).Magnitude
+                if distance < 15 then
+                    -- Move player towards it (optional)
+                    hrp.CFrame = CFrame.new(obj.HumanoidRootPart.Position)
+                end
+            end
+        end
+    end
+end
+
+-- AUTO UPGRADE
+local function autoUpgrade()
+    local upgradeButton = game:GetService("CoreGui"):FindFirstChild("UpgradeButton")
+    if upgradeButton and upgradeButton:IsA("TextButton") then
+        clickButton(upgradeButton)
+        task.wait(0.5)
+        local upgradeFrame = game:GetService("CoreGui"):FindFirstChild("UpgradeFrame")
+        if upgradeFrame then
+            for _, btn in pairs(upgradeFrame:GetDescendants()) do
+                if btn:IsA("TextButton") and btn.Visible and btn.Active then
+                    clickButton(btn)
+                    task.wait(0.2)
+                end
+            end
+        end
+    end
+end
+
+-- AUTO REBIRTH
+local function autoRebirth()
+    local rebirthButton = game:GetService("CoreGui"):FindFirstChild("RebirthButton")
+    if rebirthButton and rebirthButton:IsA("TextButton") then
+        clickButton(rebirthButton)
+        task.wait(1)
+        local confirm = game:GetService("CoreGui"):FindFirstChild("ConfirmRebirth")
+        if confirm then
+            clickButton(confirm)
+            ShadowHub.Notify("Rebirth", "Rebirth completed!", 3)
+        end
+    end
+end
+
+-- AUTO POTION USE
+local potionsList = {"LuckBoost", "CurrencyBoost"}
+local function autoPotionUse()
+    local backpack = game:GetService("CoreGui"):FindFirstChild("Backpack")
+    if backpack then
+        for _, potion in pairs(potionsList) do
+            local potionBtn = backpack:FindFirstChild(potion)
+            if potionBtn and potionBtn:IsA("TextButton") and potionBtn.Visible then
+                clickButton(potionBtn)
+                task.wait(0.3)
+            end
+        end
+    end
+end
+
+-- AUTO EQUIP BEST
+local function autoEquipBest()
+    local equipBtn = game:GetService("CoreGui"):FindFirstChild("EquipBestButton")
+    if equipBtn and equipBtn:IsA("TextButton") then
+        clickButton(equipBtn)
+    end
+end
+
+-- KILL ALL SLIMES (if combat exists)
+local function killAllSlimes()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") then
+            local humanoid = v:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                humanoid.Health = 0
+            end
+        end
+    end
+end
+
+-- VISUAL TOGGLES
+local function setFullBright(enabled)
+    local lighting = game:GetService("Lighting")
+    if enabled then
+        lighting.Brightness = 2
+        lighting.ClockTime = 14
+        lighting.FogEnd = 100000
+        lighting.GlobalShadows = false
+    else
+        lighting.Brightness = 1
+        lighting.ClockTime = 8
+        lighting.FogEnd = 1000
+        lighting.GlobalShadows = true
+    end
+end
+
+local function removeParticles()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter") then v.Enabled = false end
+    end
+end
+
+local function removeShadows()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("BasePart") then v.CastShadow = false end
+    end
+    game:GetService("Lighting").GlobalShadows = false
+end
+
+-- ESP (simplified)
+local espObjects = {}
+local function clearESP()
+    for _, esp in pairs(espObjects) do
+        pcall(function() esp:Destroy() end)
+    end
+    espObjects = {}
+end
+
+local function slimeESP()
+    clearESP()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:find("Slime") then
+            local box = Instance.new("BoxHandleAdornment")
+            box.Adornee = v
+            box.Size = Vector3.new(4, 4, 4)
+            box.Color3 = Color3.fromRGB(255, 100, 100)
+            box.AlwaysOnTop = true
+            box.Parent = v
+            table.insert(espObjects, box)
+        end
+    end
+end
+
+-- WATERMARK
+local watermark = Instance.new("TextLabel")
+watermark.Name = "ShadowHubWatermark"
+watermark.Size = UDim2.new(0, 220, 0, 25)
+watermark.Position = UDim2.new(0, 10, 1, -35)
+watermark.BackgroundTransparency = 0.5
+watermark.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+watermark.TextColor3 = Color3.fromRGB(255, 255, 255)
+watermark.TextSize = 12
+watermark.Font = Enum.Font.Gotham
+local watermarkCorner = Instance.new("UICorner")
+watermarkCorner.CornerRadius = UDim.new(0, 6)
+watermarkCorner.Parent = watermark
+
+local watermarkActive = true
+local function updateWatermark()
+    local fps = math.floor(1 / task.wait())
+    local memory = math.floor(collectgarbage("count"))
+    watermark.Text = string.format("Shadow Hub | %s | FPS: %d | Mem: %dMB | Rolls: %d",
+        ShadowHub.Executor, fps, memory, ShadowHub.Stats.Rolls)
+end
+
+local function startWatermark()
+    pcall(function() watermark.Parent = game:GetService("CoreGui") end)
+    watermark.Visible = true
+    task.spawn(function()
+        while watermarkActive do
+            pcall(updateWatermark)
+            task.wait(1)
+        end
+    end)
+end
+
+-- LOOP MANAGEMENT
+local function startLoop(name, func, interval)
+    if ShadowHub.Loops[name] then
+        task.cancel(ShadowHub.Loops[name])
+    end
+    ShadowHub.Loops[name] = task.spawn(function()
+        while ShadowHub.Toggles[name] do
+            pcall(func)
+            task.wait(interval)
+        end
+    end)
+end
+
+local function stopLoop(name)
+    if ShadowHub.Loops[name] then
+        task.cancel(ShadowHub.Loops[name])
+        ShadowHub.Loops[name] = nil
+    end
+end
+
+-- CREATE TOGGLE HELPER
+local function setupToggle(tab, flag, label, callback, interval)
+    interval = interval or 0.5
+    local toggle = Rayfield:CreateToggle({
+        Name = label,
+        CurrentValue = false,
+        Flag = flag,
+        Callback = function(value)
+            ShadowHub.Toggles[flag] = value
+            if value then
+                startLoop(flag, callback, interval)
+            else
+                stopLoop(flag)
+            end
+        end,
+        Parent = tab
+    })
+    ShadowHub.Flags[flag] = toggle
+end
+
+-- MOBILE MINIMIZE BUTTON
+local function setupMobileUI()
+    local minimizeBtn = Instance.new("TextButton")
+    minimizeBtn.Size = UDim2.new(0, 40, 0, 40)
+    minimizeBtn.Position = UDim2.new(0, 10, 0, 60)
+    minimizeBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    minimizeBtn.Text = "−"
+    minimizeBtn.TextSize = 24
+    minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    minimizeBtn.Font = Enum.Font.GothamBold
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = minimizeBtn
+    minimizeBtn.Parent = game:GetService("CoreGui")
+    minimizeBtn.MouseButton1Click:Connect(function()
+        local rayfieldGui = game:GetService("CoreGui"):FindFirstChild("Rayfield")
+        if rayfieldGui then
+            rayfieldGui.Visible = not rayfieldGui.Visible
+            minimizeBtn.Text = rayfieldGui.Visible and "−" or "+"
+        end
+    end)
+end
+
+-- CONFIG SAVE/LOAD (simple)
+local function saveConfig()
+    local data = {}
+    for k, v in pairs(ShadowHub.Toggles) do
+        data[k] = v
+    end
+    local json = game:GetService("HttpService"):JSONEncode(data)
+    writefile("ShadowHub_SlimeRNG.json", json)
+    ShadowHub.Notify("Config Saved", "Configuration saved.", 2)
+end
+
+local function loadConfig()
+    if isfile("ShadowHub_SlimeRNG.json") then
+        local json = readfile("ShadowHub_SlimeRNG.json")
+        local data = game:GetService("HttpService"):JSONDecode(json)
+        for flag, value in pairs(data) do
+            if ShadowHub.Flags[flag] then
+                Rayfield:SetFlag(flag, value)
+                ShadowHub.Toggles[flag] = value
+                if value then
+                    -- restart loop if needed
+                    local callback = ShadowHub.Callbacks[flag]
+                    if callback then
+                        startLoop(flag, callback, 0.5)
+                    end
+                end
+            end
+        end
+        ShadowHub.Notify("Config Loaded", "Configuration loaded.", 2)
+    else
+        ShadowHub.Notify("No Config", "No saved config found.", 2)
+    end
+end
+
+-- REJOIN
+local function rejoinServer()
+    game:GetService("TeleportService"):Teleport(game.PlaceId)
+end
+
+-- SERVER HOP
+local function serverHop()
+    local http = game:GetService("HttpService")
+    local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?limit=100"
+    local success, response = pcall(function() return http:HttpGetAsync(url) end)
+    if success then
+        local data = http:JSONDecode(response)
+        for _, server in pairs(data.data) do
+            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, server.id)
+                return
+            end
+        end
+    end
+    ShadowHub.Notify("Server Hop", "No available servers found.", 2)
+end
+
+-- INITIALIZE RAYFIELD UI
+pcall(function()
+    Rayfield:LoadConfiguration({
+        ConfigurationSaving = { Enabled = true, FileName = "ShadowHub_SlimeRNG" },
+        Discord = { Enabled = true, SendJoins = true, ID = "https://discord.gg/shadowhub" },
+        KeySystem = false
+    })
+end)
+
+local Window = Rayfield:CreateWindow({
+    Name = "Shadow Hub | Slime RNG",
+    LoadingTitle = "Shadow Hub",
+    LoadingSubtitle = "Premium Slime RNG System",
+    ConfigurationSaving = { Enabled = true, FileName = "ShadowHub_SlimeRNG_Window" },
+    Discord = { Enabled = true, Invite = "https://discord.gg/shadowhub", RememberJoins = true }
+})
+
+-- CREATE TABS
+local MainTab = Window:CreateTab("Main", 4483362458)
+local FarmTab = Window:CreateTab("Farm", 4483362458)
+local RNGRow = Window:CreateTab("RNG", 4483362458)
+local UpgradesTab = Window:CreateTab("Upgrades", 4483362458)
+local TeleportsTab = Window:CreateTab("Teleports", 4483362458)
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local CreditsTab = Window:CreateTab("Credits", 4483362458)
+
+-- MAIN TAB
+setupToggle(MainTab, "AutoFarmSelected", "Auto Farm Selected Slime", function()
+    local target = nil
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:find("Slime") then
+            local slimeHrp = v:FindFirstChild("HumanoidRootPart")
+            if slimeHrp then
+                local dist = (slimeHrp.Position - hrp.Position).Magnitude
+                if not target or dist < target.dist then
+                    target = {slime = v, dist = dist}
+                end
+            end
+        end
+    end
+    if target and target.slime:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = target.slime.HumanoidRootPart.CFrame + Vector3.new(0, 0, 5)
+    end
+end, 0.3)
+
+setupToggle(MainTab, "AutoLoot", "Auto Collect Loot", autoLoot, 0.5)
+setupToggle(MainTab, "AutoEquipBest", "Auto Equip Best", autoEquipBest, 5)
+setupToggle(MainTab, "AutoUpgrade", "Auto Upgrade", autoUpgrade, 3)
+setupToggle(MainTab, "AutoRebirth", "Auto Rebirth", autoRebirth, 60)
+setupToggle(MainTab, "AutoPotionUse", "Auto Potion Use", autoPotionUse, 30)
+
+-- FARM TAB
+setupToggle(FarmTab, "AutoFarmClosest", "Auto Farm Closest Slime", function()
+    local closest = nil
+    local closestDist = math.huge
+    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v.Name:find("Slime") then
+            local slimeHrp = v:FindFirstChild("HumanoidRootPart")
+            if slimeHrp then
+                local dist = (slimeHrp.Position - hrp.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closest = v
+                end
+            end
+        end
+    end
+    if closest and closest:FindFirstChild("HumanoidRootPart") then
+        hrp.CFrame = closest.HumanoidRootPart.CFrame + Vector3.new(0, 0, 5)
+    end
+end, 0.3)
+
+Rayfield:CreateButton({
+    Name = "Kill All Slimes",
+    Callback = killAllSlimes,
+    Parent = FarmTab
+})
+
+-- RNG TAB
+setupToggle(RNGRow, "AutoRoll", "Auto Roll", autoRoll, 0.5)
+
+Rayfield:CreateSlider({
+    Name = "Roll Speed (ms)",
+    Range = {100, 1000},
+    Increment = 10,
+    Suffix = "ms",
+    CurrentValue = 500,
+    Flag = "RollSpeed",
+    Callback = function(val)
+        if ShadowHub.Toggles.AutoRoll then
+            startLoop("AutoRoll", autoRoll, val / 1000)
+        end
+    end,
+    Parent = RNGRow
+})
+
+Rayfield:CreateButton({
+    Name = "Reset Roll Counter",
+    Callback = function()
+        ShadowHub.Stats.Rolls = 0
+        ShadowHub.Stats.RareRolls = 0
+        ShadowHub.Notify("Reset", "Roll counter reset.", 2)
+    end,
+    Parent = RNGRow
+})
+
+Rayfield:CreateButton({
+    Name = "Force Roll Now",
+    Callback = autoRoll,
+    Parent = RNGRow
+})
+
+-- UPGRADES TAB
+Rayfield:CreateButton({
+    Name = "Quick Upgrade All (5x)",
+    Callback = function()
+        for i = 1, 5 do
+            autoUpgrade()
+            task.wait(0.3)
+        end
+    end,
+    Parent = UpgradesTab
+})
+
+Rayfield:CreateButton({
+    Name = "Buy Luck Upgrades",
+    Callback = function()
+        autoUpgrade()
+    end,
+    Parent = UpgradesTab
+})
+
+-- TELEPORTS TAB
+Rayfield:CreateDropdown({
+    Name = "Teleport To Zone",
+    Options = TeleportZones,
+    CurrentOption = "Meadow",
+    Flag = "TeleportZone",
+    Callback = teleportToZone,
+    Parent = TeleportsTab
+})
+
+-- PLAYER TAB
+Rayfield:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {16, 250},
+    Increment = 1,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "WalkSpeed",
+    Callback = function(val)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = val
+        end
+    end,
+    Parent = PlayerTab
+})
+
+Rayfield:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = "Power",
+    CurrentValue = 50,
+    Flag = "JumpPower",
+    Callback = function(val)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.JumpPower = val
+        end
+    end,
+    Parent = PlayerTab
+})
+
+setupToggle(PlayerTab, "Fly", "Fly", function()
+    local flying = false
+    local bv, bg = nil, nil
+    task.spawn(function()
+        while ShadowHub.Toggles.Fly do
+            if not flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                flying = true
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                bv = Instance.new("BodyVelocity")
+                bg = Instance.new("BodyGyro")
+                bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+                bv.Velocity = Vector3.new(0, 0, 0)
+                bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+                bg.CFrame = hrp.CFrame
+                bv.Parent = hrp
+                bg.Parent = hrp
+                LocalPlayer.Character.Humanoid.PlatformStand = true
+            elseif flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = LocalPlayer.Character.HumanoidRootPart
+                local camPos = workspace.CurrentCamera.CFrame.Position
+                local dir = (camPos - hrp.Position).Unit
+                bv.Velocity = dir * 50
+                bg.CFrame = CFrame.new(hrp.Position, camPos)
+            end
+            task.wait()
+        end
+        if bv then bv:Destroy() end
+        if bg then bg:Destroy() end
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.PlatformStand = false
+        end
+        flying = false
+    end)
+end, 0)
+
+setupToggle(PlayerTab, "InfiniteJump", "Infinite Jump", function()
+    local connection
+    if ShadowHub.Toggles.InfiniteJump then
+        connection = UserInputService.JumpRequest:Connect(function()
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+        end)
+    elseif connection then
+        connection:Disconnect()
+    end
+end, 0)
+
+setupToggle(PlayerTab, "Noclip", "Noclip", function()
+    local stepConn
+    if ShadowHub.Toggles.Noclip then
+        stepConn = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+                for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    elseif stepConn then
+        stepConn:Disconnect()
+    end
+end, 0)
+
+setupToggle(PlayerTab, "AntiAFK", "Anti AFK", initAntiAFK, 0)
+
+-- VISUAL TAB
+Rayfield:CreateButton({
+    Name = "FPS Boost (All)",
+    Callback = function()
+        setupAntiLag()
+        removeParticles()
+        removeShadows()
+        setFullBright(true)
+        ShadowHub.Notify("FPS Boost", "Optimizations applied.", 2)
+    end,
+    Parent = VisualTab
+})
+
+Rayfield:CreateButton({
+    Name = "Potato Graphics",
+    Callback = function()
+        settings().Rendering.QualityLevel = 1
+        removeParticles()
+        removeShadows()
+        ShadowHub.Notify("Potato Mode", "Lowest settings.", 2)
+    end,
+    Parent = VisualTab
+})
+
+setupToggle(VisualTab, "FullBright", "Full Bright", setFullBright, 0)
+
+Rayfield:CreateButton({
+    Name = "Remove Shadows",
+    Callback = removeShadows,
+    Parent = VisualTab
+})
+
+Rayfield:CreateButton({
+    Name = "Disable Particles",
+    Callback = removeParticles,
+    Parent = VisualTab
+})
+
+setupToggle(VisualTab, "SlimeESP", "Slime ESP", slimeESP, 2)
+
+-- SETTINGS TAB
+Rayfield:CreateButton({
+    Name = "Save Config",
+    Callback = saveConfig,
+    Parent = SettingsTab
+})
+
+Rayfield:CreateButton({
+    Name = "Load Config",
+    Callback = loadConfig,
+    Parent = SettingsTab
+})
+
+Rayfield:CreateButton({
+    Name = "Rejoin Server",
+    Callback = rejoinServer,
+    Parent = SettingsTab
+})
+
+Rayfield:CreateButton({
+    Name = "Server Hop",
+    Callback = serverHop,
+    Parent = SettingsTab
+})
+
+Rayfield:CreateButton({
+    Name = "Destroy UI",
+    Callback = function()
+        watermarkActive = false
+        Rayfield:Destroy()
+        ShadowHub.Notify("UI Destroyed", "Shadow Hub unloaded.", 2)
+    end,
+    Parent = SettingsTab
+})
+
+-- CREDITS TAB
+Rayfield:CreateButton({
+    Name = "Show Credits",
+    Callback = function()
+        ShadowHub.Notify("Shadow Hub", "Premium Slime RNG System\nCreated for Slime RNG by Stouts Studio\nVersion: " .. ShadowHub.Version .. "\nExecutor: " .. ShadowHub.Executor, 5)
+    end,
+    Parent = CreditsTab
+})
+
+-- INITIALIZE
+task.spawn(function()
+    startWatermark()
+    initAntiAFK()
+    if ShadowHub.Mobile then
+        setupMobileUI()
+    end
+    setupAntiLag()
+    ShadowHub.Notify("Shadow Hub Loaded", "Welcome to Shadow Hub - Premium Slime RNG Automation", 4)
+end)
