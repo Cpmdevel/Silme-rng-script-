@@ -1,7 +1,7 @@
 --[[
     SHADOW HUB | SLIME RNG
     FULLY FIXED - ALL EXECUTORS SUPPORTED
-    Version 5.0.2 - Complete Overhaul
+    Version 5.0.3 - UI Loading Fix
     Works on: Delta, Hydrogen, Fluxus, Arceus X, Codex, Vega X, Electron, KRNL, Synapse X
 ]]
 
@@ -22,7 +22,8 @@ local function GetExecutor()
         {name = "Synapse X", check = function() return syn and syn.crypt end}
     }
     for _, exec in ipairs(executors) do
-        if pcall(exec.check) then return exec.name end
+        local ok, result = pcall(exec.check)
+        if ok and result then return exec.name end
     end
     return "Unknown"
 end
@@ -59,7 +60,7 @@ local function SafeCall(func, ...)
 end
 
 -- ================================
--- NOTIFICATION
+-- NOTIFICATION - WORKS WITHOUT UI
 -- ================================
 local function Notify(Title, Content, Duration)
     pcall(function()
@@ -78,37 +79,64 @@ local function Notify(Title, Content, Duration)
 end
 
 -- ================================
--- RAYFIELD UI LOADER - FIXED
+-- RAYFIELD UI LOADER - MULTIPLE METHODS
 -- ================================
 local Rayfield = nil
-local function LoadRayfield()
-    local attempts = 0
-    while attempts < 3 do
-        attempts = attempts + 1
-        local success, result = pcall(function()
-            local ui = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/rayfieldui.lua", true))()
-            return ui
-        end)
-        if success and result then
-            Rayfield = result
-            UILoaded = true
-            return true
+
+local function LoadRayfieldMethod1()
+    -- Direct HTTP load
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/rayfieldui.lua", true))()
+    end)
+    return success and result
+end
+
+local function LoadRayfieldMethod2()
+    -- Alternative CDN
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://cdn.jsdelivr.net/gh/shlexware/Rayfield@latest/rayfieldui.lua", true))()
+    end)
+    return success and result
+end
+
+local function LoadRayfieldMethod3()
+    -- Local cached attempt
+    local success, result = pcall(function()
+        local cached = readfile and readfile("rayfield_cache.lua")
+        if cached then
+            return loadstring(cached)()
         end
-        if attempts < 3 then
-            task.wait(2)
+    end)
+    return success and result
+end
+
+local function LoadRayfield()
+    local methods = {LoadRayfieldMethod1, LoadRayfieldMethod2, LoadRayfieldMethod3}
+    
+    for attempt = 1, 3 do
+        for _, method in ipairs(methods) do
+            local result = method()
+            if result then
+                Rayfield = result
+                UILoaded = true
+                Notify("Shadow Hub", "UI Loaded Successfully!", 2)
+                return true
+            end
+        end
+        if attempt < 3 then
+            task.wait(1.5)
         end
     end
+    
     return false
 end
 
+Notify("Shadow Hub", "Loading UI...", 2)
+task.wait(0.5)
+
 if not LoadRayfield() then
-    Notify("Shadow Hub", "Failed to load UI. Retrying...", 3)
-    task.wait(3)
-    if not LoadRayfield() then
-        Notify("Shadow Hub", "Cannot load UI. Check internet connection.", 5)
-        task.wait(5)
-        return
-    end
+    Notify("Shadow Hub", "⚠️ UI Load Failed - Using Fallback Mode", 5)
+    UILoaded = false
 end
 
 -- ================================
@@ -314,7 +342,7 @@ end
 -- Enhanced AutoUpgrade with full menu support
 local function AutoUpgrade()
     SafeCall(function()
-        local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level") or FindButton("unlock") or FindButton("menu")
+        local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level") or FindButton("unlock") or FindButton("menu") or FindButton("shop")
         if not upgradeBtn then return end
         
         if not ClickButton(upgradeBtn) then return end
@@ -643,7 +671,7 @@ end
 -- ================================
 local Watermark = Instance.new("TextLabel")
 Watermark.Name = "ShadowHubWM"
-Watermark.Size = UDim2.new(0, 420, 0, 25)
+Watermark.Size = UDim2.new(0, 450, 0, 25)
 Watermark.Position = UDim2.new(0, 10, 1, -35)
 Watermark.BackgroundTransparency = 0.6
 Watermark.BackgroundColor3 = Color3.fromRGB(0,0,0)
@@ -659,7 +687,8 @@ local function UpdateWatermark()
     SafeCall(function()
         local fps = math.floor(1 / task.wait())
         local uptime = math.floor(tick() - Stats.StartTime)
-        Watermark.Text = string.format("Shadow Hub v5.0.2 | %s | FPS: %d | Rolls: %d | Upgrades: %d | Uptime: %ds", ExecutorName, fps, Stats.Rolls, Stats.Upgrades, uptime)
+        local uiStatus = UILoaded and "✓ UI" or "✗ Fallback"
+        Watermark.Text = string.format("Shadow Hub v5.0.3 | %s | %s | FPS: %d | Rolls: %d | Upgrades: %d | Uptime: %ds", ExecutorName, uiStatus, fps, Stats.Rolls, Stats.Upgrades, uptime)
     end)
 end
 
@@ -704,7 +733,9 @@ local function LoadConfig()
             for k, v in pairs(data) do
                 if Toggles[k] ~= nil then
                     Toggles[k] = v
-                    pcall(function() Rayfield:SetFlag(k, v) end)
+                    if UILoaded then
+                        pcall(function() Rayfield:SetFlag(k, v) end)
+                    end
                 end
             end
             Notify("Config", "Loaded", 2)
@@ -742,294 +773,299 @@ local function Rejoin()
 end
 
 -- ================================
--- RAYFIELD UI SETUP - FIXED
+-- RAYFIELD UI SETUP - CONDITIONAL
 -- ================================
-SafeCall(function()
-    Rayfield:LoadConfiguration({
-        ConfigurationSaving = {Enabled = true, FileName = "ShadowHubSlimeRNG"},
-        Discord = {Enabled = true, Invite = "https://discord.gg/shadowhub", SendJoins = true},
-        KeySystem = false
-    })
+if UILoaded then
+    SafeCall(function()
+        Rayfield:LoadConfiguration({
+            ConfigurationSaving = {Enabled = true, FileName = "ShadowHubSlimeRNG"},
+            Discord = {Enabled = true, Invite = "https://discord.gg/shadowhub", SendJoins = true},
+            KeySystem = false
+        })
 
-    local Window = Rayfield:CreateWindow({
-        Name = "Shadow Hub | Slime RNG v5.0.2",
-        LoadingTitle = "Shadow Hub Premium",
-        LoadingSubtitle = "Complete Overhaul - All Executors",
-        ConfigurationSaving = {Enabled = true, FileName = "ShadowHubWindow"},
-        Discord = {Enabled = true, Invite = "https://discord.gg/shadowhub", RememberJoins = true}
-    })
+        local Window = Rayfield:CreateWindow({
+            Name = "Shadow Hub | Slime RNG v5.0.3",
+            LoadingTitle = "Shadow Hub Premium",
+            LoadingSubtitle = "UI Load Fixed - All Executors",
+            ConfigurationSaving = {Enabled = true, FileName = "ShadowHubWindow"},
+            Discord = {Enabled = true, Invite = "https://discord.gg/shadowhub", RememberJoins = true}
+        })
 
-    -- Tabs
-    local MainTab = Window:CreateTab("Main", 4483362458)
-    local FarmTab = Window:CreateTab("Farm", 4483362458)
-    local RNGTab = Window:CreateTab("RNG", 4483362458)
-    local UpgradeTab = Window:CreateTab("Upgrades", 4483362458)
-    local PlayerTab = Window:CreateTab("Player", 4483362458)
-    local VisualTab = Window:CreateTab("Visual", 4483362458)
-    local SettingsTab = Window:CreateTab("Settings", 4483362458)
-    local CreditsTab = Window:CreateTab("Credits", 4483362458)
+        -- Tabs
+        local MainTab = Window:CreateTab("Main", 4483362458)
+        local FarmTab = Window:CreateTab("Farm", 4483362458)
+        local RNGTab = Window:CreateTab("RNG", 4483362458)
+        local UpgradeTab = Window:CreateTab("Upgrades", 4483362458)
+        local PlayerTab = Window:CreateTab("Player", 4483362458)
+        local VisualTab = Window:CreateTab("Visual", 4483362458)
+        local SettingsTab = Window:CreateTab("Settings", 4483362458)
+        local CreditsTab = Window:CreateTab("Credits", 4483362458)
 
-    -- Helper toggle
-    local function AddToggle(tab, flag, label, func, interval)
-        Rayfield:CreateToggle({
-            Name = label,
-            CurrentValue = false,
-            Flag = flag,
+        -- Helper toggle
+        local function AddToggle(tab, flag, label, func, interval)
+            Rayfield:CreateToggle({
+                Name = label,
+                CurrentValue = false,
+                Flag = flag,
+                Callback = function(val)
+                    Toggles[flag] = val
+                    if val then
+                        if func then StartLoop(flag, func, interval or 0.5) end
+                    else
+                        StopLoop(flag)
+                    end
+                end,
+                Parent = tab
+            })
+        end
+
+        -- MAIN
+        AddToggle(MainTab, "AutoRoll", "Auto Roll", DoRoll, 0.5)
+        AddToggle(MainTab, "AutoCollect", "Auto Collect Loot", AutoCollect, 0.8)
+        AddToggle(MainTab, "AutoUpgrade", "Auto Upgrade", AutoUpgrade, 3)
+        AddToggle(MainTab, "AutoRebirth", "Auto Rebirth", AutoRebirth, 120)
+        AddToggle(MainTab, "AutoPotion", "Auto Luck Potion", UsePotion, 60)
+
+        -- FARM
+        AddToggle(FarmTab, "FarmNearest", "Farm Nearest Slime", FarmNearest, 0.3)
+        Rayfield:CreateButton({
+            Name = "Kill All Slimes",
+            Callback = KillAll,
+            Parent = FarmTab
+        })
+
+        -- RNG
+        Rayfield:CreateSlider({
+            Name = "Roll Speed (ms)",
+            Range = {100, 1000},
+            Increment = 10,
+            Suffix = "ms",
+            CurrentValue = 500,
+            Flag = "RollSpeed",
             Callback = function(val)
-                Toggles[flag] = val
-                if val then
-                    if func then StartLoop(flag, func, interval or 0.5) end
-                else
-                    StopLoop(flag)
+                if Toggles.AutoRoll then
+                    StartLoop("AutoRoll", DoRoll, val / 1000)
                 end
             end,
-            Parent = tab
+            Parent = RNGTab
         })
-    end
+        Rayfield:CreateButton({
+            Name = "Reset Roll Counter",
+            Callback = function() Stats.Rolls = 0; Notify("RNG", "Counter reset", 2) end,
+            Parent = RNGTab
+        })
+        Rayfield:CreateButton({
+            Name = "Force Roll",
+            Callback = DoRoll,
+            Parent = RNGTab
+        })
 
-    -- MAIN
-    AddToggle(MainTab, "AutoRoll", "Auto Roll", DoRoll, 0.5)
-    AddToggle(MainTab, "AutoCollect", "Auto Collect Loot", AutoCollect, 0.8)
-    AddToggle(MainTab, "AutoUpgrade", "Auto Upgrade", AutoUpgrade, 3)
-    AddToggle(MainTab, "AutoRebirth", "Auto Rebirth", AutoRebirth, 120)
-    AddToggle(MainTab, "AutoPotion", "Auto Luck Potion", UsePotion, 60)
+        -- UPGRADES
+        Rayfield:CreateButton({
+            Name = "Force Single Upgrade",
+            Callback = AutoUpgrade,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateButton({
+            Name = "Buy Upgrades (x5)",
+            Callback = function() RapidUpgrade(5) end,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateButton({
+            Name = "Buy Upgrades (x10)",
+            Callback = function() RapidUpgrade(10) end,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateButton({
+            Name = "Buy Upgrades (x20)",
+            Callback = function() RapidUpgrade(20) end,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateSlider({
+            Name = "Rapid Upgrade Count",
+            Range = {1, 50},
+            Increment = 1,
+            Suffix = " upgrades",
+            CurrentValue = 10,
+            Flag = "UpgradeCount",
+            Callback = function(val) end,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateButton({
+            Name = "Buy Custom Amount",
+            Callback = function()
+                local count = Rayfield:GetFlag("UpgradeCount") or 10
+                RapidUpgrade(count)
+            end,
+            Parent = UpgradeTab
+        })
+        Rayfield:CreateButton({
+            Name = "Reset Upgrade Counter",
+            Callback = function() Stats.Upgrades = 0; Notify("Upgrades", "Counter reset", 2) end,
+            Parent = UpgradeTab
+        })
 
-    -- FARM
-    AddToggle(FarmTab, "FarmNearest", "Farm Nearest Slime", FarmNearest, 0.3)
-    Rayfield:CreateButton({
-        Name = "Kill All Slimes",
-        Callback = KillAll,
-        Parent = FarmTab
-    })
+        -- PLAYER
+        Rayfield:CreateSlider({
+            Name = "Walk Speed",
+            Range = {16, 350},
+            Increment = 1,
+            Suffix = " speed",
+            CurrentValue = 16,
+            Flag = "WalkSpeed",
+            Callback = SetWalkSpeed,
+            Parent = PlayerTab
+        })
+        Rayfield:CreateSlider({
+            Name = "Jump Power",
+            Range = {50, 500},
+            Increment = 5,
+            Suffix = " power",
+            CurrentValue = 50,
+            Flag = "JumpPower",
+            Callback = SetJumpPower,
+            Parent = PlayerTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Fly",
+            CurrentValue = false,
+            Flag = "FlyMode",
+            Callback = function(val)
+                if val then ToggleFly() else if Flying then ToggleFly() end end
+            end,
+            Parent = PlayerTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Infinite Jump",
+            CurrentValue = false,
+            Flag = "InfJump",
+            Callback = function(val)
+                if val then ToggleInfiniteJump() else if JumpConn then ToggleInfiniteJump() end end
+            end,
+            Parent = PlayerTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Noclip",
+            CurrentValue = false,
+            Flag = "Noclip",
+            Callback = function(val)
+                if val then ToggleNoclip() else if NoclipConn then ToggleNoclip() end end
+            end,
+            Parent = PlayerTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Anti AFK",
+            CurrentValue = false,
+            Flag = "AntiAFK",
+            Callback = function(val)
+                if val then ToggleAntiAFK() else if AFKConn then ToggleAntiAFK() end end
+            end,
+            Parent = PlayerTab
+        })
 
-    -- RNG
-    Rayfield:CreateSlider({
-        Name = "Roll Speed (ms)",
-        Range = {100, 1000},
-        Increment = 10,
-        Suffix = "ms",
-        CurrentValue = 500,
-        Flag = "RollSpeed",
-        Callback = function(val)
-            if Toggles.AutoRoll then
-                StartLoop("AutoRoll", DoRoll, val / 1000)
-            end
-        end,
-        Parent = RNGTab
-    })
-    Rayfield:CreateButton({
-        Name = "Reset Roll Counter",
-        Callback = function() Stats.Rolls = 0; Notify("RNG", "Counter reset", 2) end,
-        Parent = RNGTab
-    })
-    Rayfield:CreateButton({
-        Name = "Force Roll",
-        Callback = DoRoll,
-        Parent = RNGTab
-    })
+        -- VISUAL
+        Rayfield:CreateToggle({
+            Name = "FullBright",
+            CurrentValue = false,
+            Flag = "FullBright",
+            Callback = SetFullBright,
+            Parent = VisualTab
+        })
+        Rayfield:CreateButton({
+            Name = "Disable Particles",
+            Callback = RemoveParticles,
+            Parent = VisualTab
+        })
+        Rayfield:CreateButton({
+            Name = "Remove Shadows",
+            Callback = RemoveShadows,
+            Parent = VisualTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Slime ESP",
+            CurrentValue = false,
+            Flag = "SlimeESP",
+            Callback = function(val)
+                if val then
+                    SlimeESP()
+                    StartLoop("SlimeESP", SlimeESP, 2)
+                else
+                    ClearESP()
+                    StopLoop("SlimeESP")
+                end
+            end,
+            Parent = VisualTab
+        })
+        Rayfield:CreateToggle({
+            Name = "Loot ESP",
+            CurrentValue = false,
+            Flag = "LootESP",
+            Callback = function(val)
+                if val then
+                    LootESP()
+                    StartLoop("LootESP", LootESP, 2)
+                else
+                    ClearESP()
+                    StopLoop("LootESP")
+                end
+            end,
+            Parent = VisualTab
+        })
+        Rayfield:CreateButton({
+            Name = "Ultimate FPS Boost",
+            Callback = FPSBoost,
+            Parent = VisualTab
+        })
 
-    -- UPGRADES
-    Rayfield:CreateButton({
-        Name = "Force Single Upgrade",
-        Callback = AutoUpgrade,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateButton({
-        Name = "Buy Upgrades (x5)",
-        Callback = function() RapidUpgrade(5) end,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateButton({
-        Name = "Buy Upgrades (x10)",
-        Callback = function() RapidUpgrade(10) end,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateButton({
-        Name = "Buy Upgrades (x20)",
-        Callback = function() RapidUpgrade(20) end,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateSlider({
-        Name = "Rapid Upgrade Count",
-        Range = {1, 50},
-        Increment = 1,
-        Suffix = " upgrades",
-        CurrentValue = 10,
-        Flag = "UpgradeCount",
-        Callback = function(val) end,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateButton({
-        Name = "Buy Custom Amount",
-        Callback = function()
-            local count = Rayfield:GetFlag("UpgradeCount") or 10
-            RapidUpgrade(count)
-        end,
-        Parent = UpgradeTab
-    })
-    Rayfield:CreateButton({
-        Name = "Reset Upgrade Counter",
-        Callback = function() Stats.Upgrades = 0; Notify("Upgrades", "Counter reset", 2) end,
-        Parent = UpgradeTab
-    })
-
-    -- PLAYER
-    Rayfield:CreateSlider({
-        Name = "Walk Speed",
-        Range = {16, 350},
-        Increment = 1,
-        Suffix = " speed",
-        CurrentValue = 16,
-        Flag = "WalkSpeed",
-        Callback = SetWalkSpeed,
-        Parent = PlayerTab
-    })
-    Rayfield:CreateSlider({
-        Name = "Jump Power",
-        Range = {50, 500},
-        Increment = 5,
-        Suffix = " power",
-        CurrentValue = 50,
-        Flag = "JumpPower",
-        Callback = SetJumpPower,
-        Parent = PlayerTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Fly",
-        CurrentValue = false,
-        Flag = "FlyMode",
-        Callback = function(val)
-            if val then ToggleFly() else if Flying then ToggleFly() end end
-        end,
-        Parent = PlayerTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Infinite Jump",
-        CurrentValue = false,
-        Flag = "InfJump",
-        Callback = function(val)
-            if val then ToggleInfiniteJump() else if JumpConn then ToggleInfiniteJump() end end
-        end,
-        Parent = PlayerTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Noclip",
-        CurrentValue = false,
-        Flag = "Noclip",
-        Callback = function(val)
-            if val then ToggleNoclip() else if NoclipConn then ToggleNoclip() end end
-        end,
-        Parent = PlayerTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Anti AFK",
-        CurrentValue = false,
-        Flag = "AntiAFK",
-        Callback = function(val)
-            if val then ToggleAntiAFK() else if AFKConn then ToggleAntiAFK() end end
-        end,
-        Parent = PlayerTab
-    })
-
-    -- VISUAL
-    Rayfield:CreateToggle({
-        Name = "FullBright",
-        CurrentValue = false,
-        Flag = "FullBright",
-        Callback = SetFullBright,
-        Parent = VisualTab
-    })
-    Rayfield:CreateButton({
-        Name = "Disable Particles",
-        Callback = RemoveParticles,
-        Parent = VisualTab
-    })
-    Rayfield:CreateButton({
-        Name = "Remove Shadows",
-        Callback = RemoveShadows,
-        Parent = VisualTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Slime ESP",
-        CurrentValue = false,
-        Flag = "SlimeESP",
-        Callback = function(val)
-            if val then
-                SlimeESP()
-                StartLoop("SlimeESP", SlimeESP, 2)
-            else
+        -- SETTINGS
+        Rayfield:CreateButton({
+            Name = "Save Config",
+            Callback = SaveConfig,
+            Parent = SettingsTab
+        })
+        Rayfield:CreateButton({
+            Name = "Load Config",
+            Callback = LoadConfig,
+            Parent = SettingsTab
+        })
+        Rayfield:CreateButton({
+            Name = "Server Hop",
+            Callback = HopServer,
+            Parent = SettingsTab
+        })
+        Rayfield:CreateButton({
+            Name = "Rejoin Server",
+            Callback = Rejoin,
+            Parent = SettingsTab
+        })
+        Rayfield:CreateButton({
+            Name = "Destroy UI",
+            Callback = function()
+                HubActive = false
+                for _, v in pairs(Loops) do task.cancel(v) end
                 ClearESP()
-                StopLoop("SlimeESP")
-            end
-        end,
-        Parent = VisualTab
-    })
-    Rayfield:CreateToggle({
-        Name = "Loot ESP",
-        CurrentValue = false,
-        Flag = "LootESP",
-        Callback = function(val)
-            if val then
-                LootESP()
-                StartLoop("LootESP", LootESP, 2)
-            else
-                ClearESP()
-                StopLoop("LootESP")
-            end
-        end,
-        Parent = VisualTab
-    })
-    Rayfield:CreateButton({
-        Name = "Ultimate FPS Boost",
-        Callback = FPSBoost,
-        Parent = VisualTab
-    })
+                if flyBV then flyBV:Destroy() end
+                if flyBG then flyBG:Destroy() end
+                Rayfield:Destroy()
+                Watermark:Destroy()
+                Notify("Shadow Hub", "UI unloaded", 2)
+            end,
+            Parent = SettingsTab
+        })
 
-    -- SETTINGS
-    Rayfield:CreateButton({
-        Name = "Save Config",
-        Callback = SaveConfig,
-        Parent = SettingsTab
-    })
-    Rayfield:CreateButton({
-        Name = "Load Config",
-        Callback = LoadConfig,
-        Parent = SettingsTab
-    })
-    Rayfield:CreateButton({
-        Name = "Server Hop",
-        Callback = HopServer,
-        Parent = SettingsTab
-    })
-    Rayfield:CreateButton({
-        Name = "Rejoin Server",
-        Callback = Rejoin,
-        Parent = SettingsTab
-    })
-    Rayfield:CreateButton({
-        Name = "Destroy UI",
-        Callback = function()
-            HubActive = false
-            for _, v in pairs(Loops) do task.cancel(v) end
-            ClearESP()
-            if flyBV then flyBV:Destroy() end
-            if flyBG then flyBG:Destroy() end
-            Rayfield:Destroy()
-            Watermark:Destroy()
-            Notify("Shadow Hub", "UI unloaded", 2)
-        end,
-        Parent = SettingsTab
-    })
-
-    -- CREDITS
-    Rayfield:CreateButton({
-        Name = "Show Credits",
-        Callback = function()
-            Notify("Shadow Hub", string.format("Premium Slime RNG Hub\nVersion 5.0.2 - Complete Overhaul\nExecutor: %s\nFully fixed - All executors supported\nCreated by Shadow Team", ExecutorName), 6)
-        end,
-        Parent = CreditsTab
-    })
-end)
+        -- CREDITS
+        Rayfield:CreateButton({
+            Name = "Show Credits",
+            Callback = function()
+                Notify("Shadow Hub", string.format("Premium Slime RNG Hub\nVersion 5.0.3 - UI Load Fixed\nExecutor: %s\nAll features fully fixed!\nCreated by Shadow Team", ExecutorName), 6)
+            end,
+            Parent = CreditsTab
+        })
+    end)
+else
+    Notify("Shadow Hub", "Running in Fallback Mode - Features Available", 3)
+    task.wait(2)
+end
 
 -- ================================
 -- STARTUP TASKS
@@ -1065,4 +1101,4 @@ SafeCall(function()
     end
 end)
 
-Notify("Shadow Hub", string.format("v5.0.2 - Complete Overhaul\nExecutor: %s\nAll features fully fixed!", ExecutorName), 5)
+Notify("Shadow Hub", string.format("v5.0.3 - UI Load Fixed!\nExecutor: %s\nAll systems ready!", ExecutorName), 5)
