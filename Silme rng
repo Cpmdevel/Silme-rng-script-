@@ -1,7 +1,7 @@
 --[[
     SHADOW HUB | SLIME RNG
     FULLY FIXED - ALL EXECUTORS SUPPORTED
-    Version 5.0.0 - Stable Release
+    Version 5.0.1 - Enhanced Menu System
     Works on: Delta, Hydrogen, Fluxus, Arceus X, Codex, Vega X, Electron, KRNL
 ]]
 
@@ -43,7 +43,7 @@ local LocalPlayer = Players.LocalPlayer
 -- ================================
 local Toggles = {}
 local Loops = {}
-local Stats = {Rolls = 0, StartTime = tick()}
+local Stats = {Rolls = 0, StartTime = tick(), Upgrades = 0}
 local HubActive = true
 
 -- ================================
@@ -175,6 +175,28 @@ local function FindButton(pattern)
     return nil
 end
 
+-- Find all buttons matching pattern
+local function FindAllButtons(pattern)
+    pattern = pattern:lower()
+    local results = {}
+    local sources = {game:GetService("CoreGui"), LocalPlayer:FindFirstChild("PlayerGui")}
+    for _, source in ipairs(sources) do
+        if source then
+            for _, v in ipairs(source:GetDescendants()) do
+                if v:IsA("TextButton") or v:IsA("ImageButton") then
+                    local name = (v.Name or ""):lower()
+                    local text = (v.Text or ""):lower()
+                    local tooltip = (v.ToolTip or ""):lower()
+                    if name:find(pattern) or text:find(pattern) or tooltip:find(pattern) then
+                        table.insert(results, v)
+                    end
+                end
+            end
+        end
+    end
+    return results
+end
+
 -- ================================
 -- CORE FUNCTIONS
 -- ================================
@@ -253,45 +275,63 @@ local function FarmNearest()
     end
 end
 
+-- Enhanced AutoUpgrade with full menu support
 local function AutoUpgrade()
-    local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level") or FindButton("unlock")
+    local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level") or FindButton("unlock") or FindButton("menu")
     if not upgradeBtn then return end
     
     if not ClickButton(upgradeBtn) then return end
-    task.wait(0.4)
+    task.wait(0.5)
     
-    -- Get the current UI state after clicking upgrade button
+    -- Get all upgrade buttons from PlayerGui
     local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
     if not playerGui then return end
     
-    -- Find all visible buttons in active UI panels
-    local upgradeMenuOpen = false
-    local buttons = {}
+    local upgradeOptions = {}
+    local priorityMap = {
+        ["luck"] = 1,
+        ["critical"] = 2,
+        ["damage"] = 3,
+        ["speed"] = 4,
+        ["attack"] = 5,
+        ["defense"] = 6,
+        ["crit"] = 2
+    }
     
-    for _, obj in ipairs(playerGui:GetDescendants()) do
-        if obj:IsA("TextButton") and obj.Visible and obj.Active then
-            buttons[#buttons + 1] = obj
-            local txt = (obj.Text or ""):lower()
-            if txt:find("luck") or txt:find("damage") or txt:find("speed") or txt:find("critical") then
-                upgradeMenuOpen = true
-            end
-        end
-    end
-    
-    -- Click upgrade options
-    if upgradeMenuOpen then
-        for _, btn in ipairs(buttons) do
-            if btn.Visible and btn.Active then
-                local txt = (btn.Text or ""):lower()
-                -- Prioritize upgrades: luck > damage > speed > critical
-                if txt:find("luck") or txt:find("damage") or txt:find("speed") or txt:find("critical") then
-                    ClickButton(btn)
-                    task.wait(0.25)
-                    break -- Only click one upgrade per cycle
+    -- Collect all visible upgrade buttons
+    for _, btn in ipairs(playerGui:GetDescendants()) do
+        if btn:IsA("TextButton") and btn.Visible and btn.Active then
+            local txt = (btn.Text or ""):lower()
+            local btnName = (btn.Name or ""):lower()
+            
+            -- Check for upgrade keywords
+            for keyword, priority in pairs(priorityMap) do
+                if txt:find(keyword) or btnName:find(keyword) then
+                    table.insert(upgradeOptions, {button = btn, priority = priority, keyword = keyword})
+                    break
                 end
             end
         end
     end
+    
+    -- Sort by priority and click highest priority
+    if #upgradeOptions > 0 then
+        table.sort(upgradeOptions, function(a, b) return a.priority < b.priority end)
+        local targetBtn = upgradeOptions[1].button
+        if ClickButton(targetBtn) then
+            Stats.Upgrades = Stats.Upgrades + 1
+            task.wait(0.3)
+        end
+    end
+end
+
+-- Rapid upgrade function
+local function RapidUpgrade(count)
+    for i = 1, count do
+        AutoUpgrade()
+        task.wait(0.2)
+    end
+    Notify("Upgrades", "Completed " .. count .. " upgrades", 2)
 end
 
 local function AutoRebirth()
@@ -532,7 +572,7 @@ end
 -- ================================
 local Watermark = Instance.new("TextLabel")
 Watermark.Name = "ShadowHubWM"
-Watermark.Size = UDim2.new(0, 360, 0, 25)
+Watermark.Size = UDim2.new(0, 400, 0, 25)
 Watermark.Position = UDim2.new(0, 10, 1, -35)
 Watermark.BackgroundTransparency = 0.6
 Watermark.BackgroundColor3 = Color3.fromRGB(0,0,0)
@@ -547,7 +587,7 @@ Watermark.Parent = game:GetService("CoreGui")
 local function UpdateWatermark()
     local fps = math.floor(1 / task.wait())
     local uptime = math.floor(tick() - Stats.StartTime)
-    Watermark.Text = string.format("Shadow Hub | %s | FPS: %d | Rolls: %d | Uptime: %ds", ExecutorName, fps, Stats.Rolls, uptime)
+    Watermark.Text = string.format("Shadow Hub v5.0.1 | %s | FPS: %d | Rolls: %d | Upgrades: %d | Uptime: %ds", ExecutorName, fps, Stats.Rolls, Stats.Upgrades, uptime)
 end
 
 -- ================================
@@ -627,9 +667,9 @@ Rayfield:LoadConfiguration({
 })
 
 local Window = Rayfield:CreateWindow({
-    Name = "Shadow Hub | Slime RNG",
+    Name = "Shadow Hub | Slime RNG v5.0.1",
     LoadingTitle = "Shadow Hub Premium",
-    LoadingSubtitle = "Slime RNG Automation",
+    LoadingSubtitle = "Enhanced Menu System",
     ConfigurationSaving = {Enabled = true, FileName = "ShadowHubWindow"},
     Discord = {Enabled = true, Invite = "https://discord.gg/shadowhub", RememberJoins = true}
 })
@@ -665,7 +705,7 @@ end
 -- MAIN
 AddToggle(MainTab, "AutoRoll", "Auto Roll", DoRoll, 0.5)
 AddToggle(MainTab, "AutoCollect", "Auto Collect Loot", AutoCollect, 0.8)
-AddToggle(MainTab, "AutoUpgrade", "Auto Upgrade", AutoUpgrade, 5)
+AddToggle(MainTab, "AutoUpgrade", "Auto Upgrade", AutoUpgrade, 3)
 AddToggle(MainTab, "AutoRebirth", "Auto Rebirth", AutoRebirth, 120)
 AddToggle(MainTab, "AutoPotion", "Auto Luck Potion", UsePotion, 60)
 
@@ -703,13 +743,48 @@ Rayfield:CreateButton({
     Parent = RNGTab
 })
 
--- UPGRADES
+-- UPGRADES - ENHANCED
 Rayfield:CreateButton({
-    Name = "Buy All Upgrades (x10)",
+    Name = "Force Single Upgrade",
+    Callback = AutoUpgrade,
+    Parent = UpgradeTab
+})
+Rayfield:CreateButton({
+    Name = "Buy Upgrades (x5)",
+    Callback = function() RapidUpgrade(5) end,
+    Parent = UpgradeTab
+})
+Rayfield:CreateButton({
+    Name = "Buy Upgrades (x10)",
+    Callback = function() RapidUpgrade(10) end,
+    Parent = UpgradeTab
+})
+Rayfield:CreateButton({
+    Name = "Buy Upgrades (x20)",
+    Callback = function() RapidUpgrade(20) end,
+    Parent = UpgradeTab
+})
+Rayfield:CreateSlider({
+    Name = "Rapid Upgrade Count",
+    Range = {1, 50},
+    Increment = 1,
+    Suffix = " upgrades",
+    CurrentValue = 10,
+    Flag = "UpgradeCount",
+    Callback = function(val) end,
+    Parent = UpgradeTab
+})
+Rayfield:CreateButton({
+    Name = "Buy Custom Amount",
     Callback = function()
-        for i = 1, 10 do AutoUpgrade(); task.wait(0.3) end
-        Notify("Upgrades", "Done", 2)
+        local count = Rayfield:GetFlag("UpgradeCount") or 10
+        RapidUpgrade(count)
     end,
+    Parent = UpgradeTab
+})
+Rayfield:CreateButton({
+    Name = "Reset Upgrade Counter",
+    Callback = function() Stats.Upgrades = 0; Notify("Upgrades", "Counter reset", 2) end,
     Parent = UpgradeTab
 })
 
@@ -865,7 +940,7 @@ Rayfield:CreateButton({
 Rayfield:CreateButton({
     Name = "Show Credits",
     Callback = function()
-        Notify("Shadow Hub", string.format("Premium Slime RNG Hub\nVersion 5.0.0\nExecutor: %s\nFully fixed - All features work\nCreated by Shadow Team", ExecutorName), 6)
+        Notify("Shadow Hub", string.format("Premium Slime RNG Hub\nVersion 5.0.1 - Enhanced Menu System\nExecutor: %s\nAll menu systems updated\nCreated by Shadow Team", ExecutorName), 6)
     end,
     Parent = CreditsTab
 })
@@ -902,4 +977,4 @@ if UserInputService.TouchEnabled then
     end)
 end
 
-Notify("Shadow Hub", string.format("Fully fixed and loaded!\nExecutor: %s\nEnjoy Slime RNG automation.", ExecutorName), 5)
+Notify("Shadow Hub", string.format("v5.0.1 - Enhanced Menu System\nExecutor: %s\nEnjoy Slime RNG automation!", ExecutorName), 5)
