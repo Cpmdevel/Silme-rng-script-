@@ -254,15 +254,41 @@ local function FarmNearest()
 end
 
 local function AutoUpgrade()
-    local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level")
-    if upgradeBtn then ClickButton(upgradeBtn) end
-    task.wait(0.3)
-    for _, btn in ipairs(game:GetService("CoreGui"):GetDescendants()) do
-        if btn:IsA("TextButton") and btn.Visible and btn.Active then
-            local txt = (btn.Text or ""):lower()
-            if txt:find("luck") or txt:find("damage") or txt:find("speed") then
-                ClickButton(btn)
-                task.wait(0.2)
+    local upgradeBtn = FindButton("upgrade") or FindButton("buy") or FindButton("level") or FindButton("unlock")
+    if not upgradeBtn then return end
+    
+    if not ClickButton(upgradeBtn) then return end
+    task.wait(0.4)
+    
+    -- Get the current UI state after clicking upgrade button
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    
+    -- Find all visible buttons in active UI panels
+    local upgradeMenuOpen = false
+    local buttons = {}
+    
+    for _, obj in ipairs(playerGui:GetDescendants()) do
+        if obj:IsA("TextButton") and obj.Visible and obj.Active then
+            buttons[#buttons + 1] = obj
+            local txt = (obj.Text or ""):lower()
+            if txt:find("luck") or txt:find("damage") or txt:find("speed") or txt:find("critical") then
+                upgradeMenuOpen = true
+            end
+        end
+    end
+    
+    -- Click upgrade options
+    if upgradeMenuOpen then
+        for _, btn in ipairs(buttons) do
+            if btn.Visible and btn.Active then
+                local txt = (btn.Text or ""):lower()
+                -- Prioritize upgrades: luck > damage > speed > critical
+                if txt:find("luck") or txt:find("damage") or txt:find("speed") or txt:find("critical") then
+                    ClickButton(btn)
+                    task.wait(0.25)
+                    break -- Only click one upgrade per cycle
+                end
             end
         end
     end
